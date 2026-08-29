@@ -1,0 +1,25 @@
+name: Compile BlitzF743Wing Firmware
+
+on: [workflow_dispatch]
+
+jobs:
+  build:
+    runs-on: ubuntu-22.04
+    container: ardupilot/ardupilot-dev-base:latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Compile Flight Firmware
+        run: |
+          git config --global --add safe.directory ${GITHUB_WORKSPACE}
+          ./waf configure --board BlitzF743Wing
+          ./waf plane
+
+      - name: Upload Binaries
+        uses: actions/upload-artifact@v4
+        with:
+          name: FC-Binaries
+          path: build/BlitzF743Wing/bin/
