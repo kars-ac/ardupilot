@@ -5,21 +5,62 @@ on: [workflow_dispatch]
 jobs:
   build:
     runs-on: ubuntu-22.04
-    container: ardupilot/ardupilot-dev-base:latest
     steps:
-      - name: Checkout Code
+      - name: Checkout Code & Submodules
         uses: actions/checkout@v4
         with:
           submodules: recursive
 
-      - name: Compile Flight Firmware
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install Build Dependencies & Python Modules
         run: |
-          git config --global --add safe.directory ${GITHUB_WORKSPACE}
+          sudo apt-get update
+          sudo apt-get install -y build-essential ccache libxml2-dev libxslt1-dev
+          pip install "empy<4" future pexpect pymavlink MAVProxy
+
+      - name: Install Certified ARM GCC 10.3 Toolchain
+        run: |
+          wget -q https://firmware.ardupilot.org/Tools/STM32-tools/gcc-arm-none-eabi-10.3-2021.10-x86_64-linux.tar.bz2
+          sudo tar -xjf gcc-arm-none-eabi-10.3-2021.10-x86_64-linux.tar.bz2 -C /opt/
+          echo "/opt/gcc-arm-none-eabi-10.3-2021.10/bin" >> $GITHUB_PATH
+
+      - name: Ensure Bootloader Definition Exists
+        run: |
+          BOARD_DIR="libraries/AP_HAL_ChibiOS/hwdef/BlitzF743Wing"
+          mkdir -p "$BOARD_DIR"
+          if [ ! -f "$BOARD_DIR/hwdef-bl.dat" ]; then
+            cat << 'EOF' > "$BOARD_DIR/hwdef-bl.dat"
+          MCU STM32H7xx STM32H743xx
+          OSCILLATOR_HZ 8000000
+          APJ_BOARD_ID 1050
+          FLASH_SIZE_KB 2048
+          FLASH_RESERVE_START_KB 0
+          FLASH_BOOTLOADER_LOAD_KB 128
+          PA11 OTG_FS_DM OTG1
+          PA12 OTG_FS_DP OTG1
+          define BOARD_NO_SAFETY_SWITCH 1
+          EOF
+          fi
+
+      - name: Build Bootloader
+        run: |
+          ./waf configure --board BlitzF743Wing --bootloader
+          ./waf bootloader
+
+      - name: Build ArduPlane Firmware
+        run: |
           ./waf configure --board BlitzF743Wing
           ./waf plane
 
-      - name: Upload Binaries
+      - name: Upload Firmware Binaries
         uses: actions/upload-artifact@v4
         with:
-          name: FC-Binaries
-          path: build/BlitzF743Wing/bin/
+          name: BlitzF743Wing-Binaries
+          path: |
+            build/BlitzF743Wing/bin/*.apj
+            build/BlitzF743Wing/bin/*.bin
+            build/BlitzF743Wing/bin/*.hex
