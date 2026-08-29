@@ -28,23 +28,95 @@ jobs:
           sudo tar -xjf gcc-arm-none-eabi-10.3-2021.10-x86_64-linux.tar.bz2 -C /opt/
           echo "/opt/gcc-arm-none-eabi-10.3-2021.10/bin" >> $GITHUB_PATH
 
-      - name: Ensure Bootloader Definition Exists
+      - name: Configure Board ID & Hardware Definitions
         run: |
+          # 1. Register board name in board_types table
+          echo "BlitzF743Wing 1050" >> Tools/AP_Bootloader/board_types.txt
+
+          # 2. Write hwdef.dat and hwdef-bl.dat
           BOARD_DIR="libraries/AP_HAL_ChibiOS/hwdef/BlitzF743Wing"
           mkdir -p "$BOARD_DIR"
-          if [ ! -f "$BOARD_DIR/hwdef-bl.dat" ]; then
-            cat << 'EOF' > "$BOARD_DIR/hwdef-bl.dat"
+
+          cat << 'EOF' > "$BOARD_DIR/hwdef.dat"
           MCU STM32H7xx STM32H743xx
           OSCILLATOR_HZ 8000000
-          APJ_BOARD_ID 1050
+
+          APJ_BOARD_ID BlitzF743Wing
+          FLASH_SIZE_KB 2048
+          FLASH_RESERVE_START_KB 128
+          FLASH_BOOTLOADER_LOAD_KB 128
+          define STORAGE_FLASH_PAGE 1
+          define HAL_STORAGE_SIZE 16384
+
+          I2C_ORDER I2C1
+          SPI_ORDER SPI1 SPI2 SPI4
+
+          PA11 OTG_FS_DM OTG1
+          PA12 OTG_FS_DP OTG1
+
+          PB8 I2C1_SCL I2C1
+          PB9 I2C1_SDA I2C1
+          BARO DPS280 I2C:0:0x76
+
+          PA5 SPI1_SCK SPI1
+          PA6 SPI1_MISO SPI1
+          PA7 SPI1_MOSI SPI1
+          PA4 ICM42688_CS CS
+          SPIDEV icm42688 SPI1 ICM42688_CS
+          IMU Invensensev3 SPI:icm42688 ROTATION_NONE
+
+          PB13 SPI2_SCK SPI2
+          PB14 SPI2_MISO SPI2
+          PB15 SPI2_MOSI SPI2
+          PB12 OSD_CS CS
+          SPIDEV osd SPI2 OSD_CS
+          OSD AT7456E SPI:osd
+
+          PE2 SPI4_SCK SPI4
+          PE5 SPI4_MISO SPI4
+          PE6 SPI4_MOSI SPI4
+          PE4 BMI270_CS CS
+          SPIDEV bmi270 SPI4 BMI270_CS
+          IMU BMI270 SPI:bmi270 ROTATION_NONE
+
+          PC8 SDMMC1_D0 SDMMC1
+          PC9 SDMMC1_D1 SDMMC1
+          PC10 SDMMC1_D2 SDMMC1
+          PC11 SDMMC1_D3 SDMMC1
+          PC12 SDMMC1_CK SDMMC1
+          PD2 SDMMC1_CMD SDMMC1
+
+          PE9  TIM1_CH1 TIM1 PWM(1)
+          PE11 TIM1_CH2 TIM1 PWM(2)
+          PE13 TIM1_CH3 TIM1 PWM(3)
+          PE14 TIM1_CH4 TIM1 PWM(4)
+
+          PA0 TIM2_CH1 TIM2 PWM(5)
+          PA1 TIM2_CH2 TIM2 PWM(6)
+          PA2 TIM2_CH3 TIM2 PWM(7)
+          PA3 TIM2_CH4 TIM2 PWM(8)
+
+          PA9  USART1_TX USART1
+          PA10 USART1_RX USART1
+          PD5  USART2_TX USART2
+          PD6  USART2_RX USART2
+          PD0  CAN1_RX CAN1
+          PD1  CAN1_TX CAN1
+          EOF
+
+          cat << 'EOF' > "$BOARD_DIR/hwdef-bl.dat"
+          MCU STM32H7xx STM32H743xx
+          OSCILLATOR_HZ 8000000
+
+          APJ_BOARD_ID BlitzF743Wing
           FLASH_SIZE_KB 2048
           FLASH_RESERVE_START_KB 0
           FLASH_BOOTLOADER_LOAD_KB 128
+
           PA11 OTG_FS_DM OTG1
           PA12 OTG_FS_DP OTG1
           define BOARD_NO_SAFETY_SWITCH 1
           EOF
-          fi
 
       - name: Build Bootloader
         run: |
